@@ -3,8 +3,6 @@
 -- Author: Marc Bafalluyi Gesti (xbafalm00)
 
 
---- TODO: If tables are not created this will fail, either catch exceptions and ignore them,
----       or just dont drop tables, maybe add it in separate file and use it just for testing the database.
 ----------- DROP TABLES -----------
 
 DROP TABLE registration CASCADE CONSTRAINTS;
