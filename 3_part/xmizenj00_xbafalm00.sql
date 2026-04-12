@@ -192,7 +192,7 @@ VALUES (3, 1, 'HEAD_COACH');
 
 -- Training
 INSERT INTO training (id, team_id, stadium_id, coach_id, training_type, training_date, training_time, auto_registration)
-VALUES (1, 1, 1, 3, 'REGULAR', DATE '2026-04-15', '17:00', 'Y');
+VALUES (1, 1, 1, 3, 'REGULAR', DATE '2026-04-25', '17:00', 'Y');
 
 -- Match (HOME)
 INSERT INTO match_event (id, team_id, stadium_id, away_address, home_away, opponent_name, match_date, match_time, roster_capacity, match_result)
@@ -216,7 +216,7 @@ COMMIT;
 ----------- SELECT -----------
 
 -- 1. List jersey numbers with their team name
--- Used in the app to display player roster grouped by team
+-- Used in the app to display which position belongs to each jersey number
 -- join of two tables --
 SELECT pl.jersey_number, pl.position_name, t.name AS team_name
 FROM player pl
@@ -232,7 +232,15 @@ JOIN stadium s ON tr.stadium_id = s.id
 WHERE tr.training_date >= SYSDATE
 ORDER BY tr.training_date, tr.training_time;
 
--- 3. List full player names with the team they play for
+-- 3. List players with their weight sorted from heaviest to lightest
+-- Used in the app to display player weight statistics
+-- join of two tables --
+SELECT p.full_name, pl.weight_kg
+FROM person p
+JOIN player pl ON p.id = pl.id
+ORDER BY pl.weight_kg DESC;
+
+-- 4. List full player names with the team they play for
 -- Used in the app to display the complete player profile with team assignment
 -- join of three tables --
 SELECT p.full_name, t.name AS team_name
@@ -241,7 +249,7 @@ JOIN player pl ON p.id = pl.id
 JOIN team t ON pl.team_id = t.id
 ORDER BY t.name, p.full_name;
 
--- 4. Tallest player height per team
+-- 5. Tallest player height per team
 -- Used in the app to show the tallest player in each team
 -- GROUP BY with aggregate function MAX --
 SELECT t.name AS team, MAX(pl.height_cm) AS tallest_player_height
@@ -250,7 +258,7 @@ JOIN player pl ON t.id = pl.team_id
 GROUP BY t.name
 ORDER BY t.name;
 
--- 5. Average age of players per team
+-- 6. Average age of players per team
 -- Used in the app to show the average player age in each team
 -- GROUP BY with aggregate function AVG --
 SELECT t.name AS team, AVG(p.age) AS average_player_age
@@ -260,7 +268,17 @@ JOIN person p ON pl.id = p.id
 GROUP BY t.name
 ORDER BY t.name;
 
--- 6. List all people who are coaches
+-- 7. Number of upcoming matches per team
+-- Used in the app to show how many future matches each team has scheduled
+-- GROUP BY with aggregate function COUNT --
+SELECT t.name AS team, COUNT(m.id) AS match_count
+FROM team t
+JOIN match_event m ON t.id = m.team_id
+WHERE m.match_date >= SYSDATE
+GROUP BY t.name
+ORDER BY t.name;
+
+-- 8. List all people who are coaches
 -- Used in the app to display the list of coaches from the person table
 -- predicate EXISTS --
 SELECT p.full_name AS coaches
@@ -272,7 +290,7 @@ WHERE EXISTS (
 )
 ORDER BY p.full_name;
 
--- 7. List all players who are registered for at least one upcoming training
+-- 9. List all players who are registered for at least one upcoming training
 -- Used in the app to show which players attend future trainings
 -- predicate IN with nested SELECT --
 SELECT p.full_name AS players_with_trainings
