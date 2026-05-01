@@ -508,7 +508,7 @@ FROM TABLE(DBMS_XPLAN.DISPLAY(NULL, 'AFTER_IDX'));
 
 ----------- GRANTS FOR SECOND TEAM MEMBER -----------
 
--- Run as first team member schema (xmizenj00):
+-- Run as xmizenj00.
 GRANT SELECT ON person TO xbafalm00;
 GRANT SELECT ON team TO xbafalm00;
 GRANT SELECT ON stadium TO xbafalm00;
@@ -521,7 +521,7 @@ GRANT SELECT ON registration TO xbafalm00;
 
 ----------- MATERIALIZED VIEW -----------
 
--- Run the following section as second member schema (xbafalm00).
+-- Run the following section as xbafalm00.
 CREATE MATERIALIZED VIEW xbafalm00.mv_registered_by_team
 BUILD IMMEDIATE
 REFRESH COMPLETE ON DEMAND
@@ -552,7 +552,7 @@ FROM xbafalm00.mv_registered_by_team
 ORDER BY team_id, event_type;
 
 
------------ WITH + CASE SELECT -----------
+----------- WITH, CASE SELECT -----------
 
 -- This query returns registration summary by team and event type,
 -- and classifies level based on number of registrations.
