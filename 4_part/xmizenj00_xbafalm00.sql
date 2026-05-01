@@ -233,7 +233,7 @@ VALUES ('REGISTERED', 'MATCH', 2, 1, 3);
 COMMIT;
 
 
------------ ADVANCED OBJECTS - TRIGGERS -----------
+----------- TRIGGERS -----------
 
 -- Trigger 1:
 -- If a training is created with auto_registration = 'Y',
@@ -277,8 +277,22 @@ FOR EACH ROW
 DECLARE
     v_limit NUMBER;
     v_count NUMBER;
+    v_player_team_id NUMBER;
+    v_event_team_id NUMBER;
 BEGIN
+    SELECT team_id INTO v_player_team_id
+    FROM player
+    WHERE id = :NEW.player_id;
+
     IF :NEW.status_name = 'REGISTERED' AND :NEW.event_type = 'MATCH' THEN
+        SELECT team_id INTO v_event_team_id
+        FROM match_event
+        WHERE id = :NEW.match_id;
+
+        IF v_player_team_id <> v_event_team_id THEN
+            RAISE_APPLICATION_ERROR(-20012, 'Player must belong to the same team as match.');
+        END IF;
+
         SELECT roster_capacity INTO v_limit
         FROM match_event
         WHERE id = :NEW.match_id;
@@ -296,6 +310,14 @@ BEGIN
     END IF;
 
     IF :NEW.status_name = 'REGISTERED' AND :NEW.event_type = 'TRAINING' THEN
+        SELECT team_id INTO v_event_team_id
+        FROM training
+        WHERE id = :NEW.training_id;
+
+        IF v_player_team_id <> v_event_team_id THEN
+            RAISE_APPLICATION_ERROR(-20013, 'Player must belong to the same team as training.');
+        END IF;
+
         SELECT s.player_capacity INTO v_limit
         FROM training t
         JOIN stadium s ON s.id = t.stadium_id
@@ -316,11 +338,10 @@ END;
 /
 
 
------------ ADVANCED OBJECTS - PROCEDURES -----------
+----------- PROCEDURES -----------
 
 -- Procedure 1:
--- Registers one player to match with checks on coach role and team consistency.
--- Uses %TYPE and %ROWTYPE and exception handling.
+-- Registers one player to match with checks on coach role and team.
 CREATE OR REPLACE PROCEDURE pr_register_player_for_match (
     p_player_id IN player.id%TYPE,
     p_match_id IN match_event.id%TYPE,
@@ -376,7 +397,6 @@ END;
 
 -- Procedure 2:
 -- Registers all players of training team for selected training.
--- Uses cursor + exception handling + %TYPE.
 CREATE OR REPLACE PROCEDURE pr_auto_register_training_players (
     p_training_id IN training.id%TYPE,
     p_coach_id IN coach.id%TYPE
@@ -482,9 +502,8 @@ ORDER BY player_id;
 
 ----------- INDEX, EXPLAIN PLAN -----------
 
--- Query used for plan analysis (JOIN + aggregation + GROUP BY)
 -- We compare plan before and after index creation.
-EXPLAIN PLAN FOR
+EXPLAIN PLAN SET STATEMENT_ID = 'BEFORE_IDX' FOR
 SELECT t.name AS team_name, r.event_type, COUNT(*) AS registration_count
 FROM registration r
 JOIN player p ON p.id = r.player_id
@@ -493,15 +512,15 @@ WHERE r.status_name = 'REGISTERED'
 GROUP BY t.name, r.event_type;
 
 SELECT *
-FROM TABLE(DBMS_XPLAN.DISPLAY);
+FROM TABLE(DBMS_XPLAN.DISPLAY(NULL, 'BEFORE_IDX'));
 
 
--- Explicit index for query acceleration
+-- Index for query acceleration
 CREATE INDEX idx_registration_status_player_event
 ON registration (status_name, player_id, event_type);
 
 
-EXPLAIN PLAN FOR
+EXPLAIN PLAN SET STATEMENT_ID = 'AFTER_IDX' FOR
 SELECT t.name AS team_name, r.event_type, COUNT(*) AS registration_count
 FROM registration r
 JOIN player p ON p.id = r.player_id
@@ -510,7 +529,7 @@ WHERE r.status_name = 'REGISTERED'
 GROUP BY t.name, r.event_type;
 
 SELECT *
-FROM TABLE(DBMS_XPLAN.DISPLAY);
+FROM TABLE(DBMS_XPLAN.DISPLAY(NULL, 'AFTER_IDX'));
 
 
 ----------- GRANTS FOR SECOND TEAM MEMBER -----------
@@ -526,11 +545,9 @@ GRANT SELECT ON match_event TO xbafalm00;
 GRANT SELECT ON registration TO xbafalm00;
 
 
------------ MATERIALIZED VIEW (SECOND MEMBER) -----------
+----------- MATERIALIZED VIEW -----------
 
 -- Run the following section as second member schema (xbafalm00).
--- If needed, replace schema names in your environment.
-
 CREATE MATERIALIZED VIEW xbafalm00.mv_registered_by_team
 BUILD IMMEDIATE
 REFRESH COMPLETE ON DEMAND
@@ -561,11 +578,10 @@ FROM xbafalm00.mv_registered_by_team
 ORDER BY team_id, event_type;
 
 
------------ WITH + CASE COMPLEX QUERY -----------
+----------- WITH + CASE SELECT -----------
 
--- NOTE:
 -- This query returns registration summary by team and event type,
--- and classifies utilization level based on number of registrations.
+-- and classifies level based on number of registrations.
 WITH team_event_summary AS (
     SELECT t.id AS team_id,
            t.name AS team_name,
