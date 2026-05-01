@@ -270,7 +270,7 @@ END;
 
 
 -- Trigger 2:
--- Checks capacity limits for match/training on INSERT or UPDATE to registration.
+-- Checks capacity limits for match on INSERT or UPDATE to registration.
 CREATE OR REPLACE TRIGGER trg_registration_capacity
 BEFORE INSERT OR UPDATE ON registration
 FOR EACH ROW
@@ -306,32 +306,6 @@ BEGIN
 
         IF v_count >= v_limit THEN
             RAISE_APPLICATION_ERROR(-20010, 'Match roster capacity exceeded.');
-        END IF;
-    END IF;
-
-    IF :NEW.status_name = 'REGISTERED' AND :NEW.event_type = 'TRAINING' THEN
-        SELECT team_id INTO v_event_team_id
-        FROM training
-        WHERE id = :NEW.training_id;
-
-        IF v_player_team_id <> v_event_team_id THEN
-            RAISE_APPLICATION_ERROR(-20013, 'Player must belong to the same team as training.');
-        END IF;
-
-        SELECT s.player_capacity INTO v_limit
-        FROM training t
-        JOIN stadium s ON s.id = t.stadium_id
-        WHERE t.id = :NEW.training_id;
-
-        SELECT COUNT(*) INTO v_count
-        FROM registration r
-        WHERE r.event_type = 'TRAINING'
-          AND r.training_id = :NEW.training_id
-          AND r.status_name = 'REGISTERED'
-          AND ( :NEW.id IS NULL OR r.id <> :NEW.id );
-
-        IF v_count >= v_limit THEN
-            RAISE_APPLICATION_ERROR(-20011, 'Training player capacity exceeded.');
         END IF;
     END IF;
 END;
